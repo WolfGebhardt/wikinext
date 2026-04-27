@@ -1,26 +1,36 @@
 # WikiNext
 
-A hybrid AI knowledge system for solo researchers working across multiple deep technical domains. Combines structured fact storage with compiled narrative synthesis -- avoiding the failure modes of both pure wiki (Karpathy-style) and pure database (OpenBrain-style) approaches.
+A hybrid AI knowledge system for solo researchers working across multiple deep technical domains. Combines structured fact storage with compiled narrative synthesis -- avoiding the failure modes of both pure wiki and pure database approaches.
 
 Built for researchers who work across domains like bioinformatics, robotics AI/ML, edgeML/tinyML, health monitoring, algorithm discovery, and multi-omics -- where the highest value is in **cross-domain connections** that conventional tools miss entirely.
 
+## Why This Exists
+
+Two important open-source projects define the current landscape for AI-powered personal knowledge:
+
+- [**Karpathy's Wiki LLM**](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) -- An elegant concept where the AI maintains a personal wiki at ingest time. New sources are read, synthesized into topic pages, cross-referenced, and contradictions flagged immediately. Queries are cheap because understanding is pre-built. But the wiki *is* the source of truth, staleness looks like confident prose, and it breaks under multi-domain scale.
+
+- [**Nate B. Jones's OpenBrain (OB1)**](https://github.com/NateBJones-Projects/OB1) -- Working infrastructure (Postgres + pgvector + MCP) where facts are stored faithfully as structured rows with metadata and embeddings. No synthesis at ingest -- queries pull relevant entries and the AI synthesizes on the fly. Clean, honest, deployable. But deep cross-document synthesis is re-derived every time, contradictions sit silently, and there's no browsable artifact to wander through.
+
+**WikiNext asks: what if you took the best of both and fixed what breaks?**
+
 ## Core Thesis
 
-The fundamental architectural choice in AI knowledge systems is **when the AI thinks**: at ingest time (wiki) or at query time (database). Both break in predictable ways. WikiNext takes a third path: **structured storage as source of truth, with a graph + wiki compiler that produces browsable narrative views on demand**.
+The fundamental architectural choice in AI knowledge systems is **when the AI thinks**: at ingest time (wiki) or at query time (database). Both break in predictable ways. WikiNext takes a third path: **structured storage as source of truth, with a knowledge graph + wiki compiler that produces browsable narrative views on demand**.
 
-### Why Not Just Wiki?
+### How WikiNext Differs
 
-- Staleness reads as confident prose, not missing data
-- Multi-agent/team writes produce merge conflicts and incoherent narratives
-- High-frequency updates (tickets, events, CRM) overwhelm re-synthesis costs
-- Early editorial choices silently drop nuance from raw sources
-
-### Why Not Just RAG/Database?
-
-- Deep cross-document synthesis is re-derived from scratch every query
-- No persistent browsable artifact -- headless by default
-- Contradictions sit silently unless you ask the exact right question
-- "Real cognitive work done and thrown away" on every query
+| Capability | Karpathy Wiki | OpenBrain (OB1) | WikiNext |
+|---|---|---|---|
+| Source of truth | Wiki pages (risky -- staleness reads as truth) | Database rows (correct) | Database rows; wiki is a regenerable compiled view |
+| When AI thinks | All at ingest (expensive per source) | All at query (expensive per question) | Three tiers: light ingest, periodic synthesis, on-demand query |
+| Contradictions | Mentioned in "lint" pass, no resolution | Schema supports edges, no auto-detection | First-class objects with typed resolution and provenance |
+| Cross-domain connections | Not modeled | Not modeled | Primary feature -- active bridge detection across domains |
+| Artifact types | Generic markdown pages | Generic "thoughts" + JSONB metadata | 9 typed schemas: paper, code, experiment, model, dataset, pipeline, hypothesis, decision, validation |
+| Hypothesis tracking | None | None | Full lifecycle: proposed → active → supported/weakened → validated/invalidated |
+| Failed experiments | Not modeled | Not modeled | First-class artifacts with failure reasons and parameters |
+| Staleness detection | Wiki drifts silently | No mechanism | Freshness marks, source provenance, regeneration from DB |
+| Browsable output | Markdown wiki (the only layer) | None (headless by design) | Compiled wiki views regenerated from graph + DB |
 
 ### The Hybrid Pattern
 
@@ -49,10 +59,10 @@ WikiNext solves this by:
 
 See [docs/architecture/](docs/architecture/) for detailed design documents:
 
-- [ADR-001: Hybrid Memory Architecture](docs/architecture/adr-001-hybrid-memory.md) -- Three-layer pattern
-- [ADR-002: Ingest vs Query Time Processing](docs/architecture/adr-002-processing-strategy.md) -- Tiered processing strategy
-- [ADR-003: Contradiction and Staleness Detection](docs/architecture/adr-003-contradiction-detection.md) -- First-class contradiction handling
-- [ADR-004: Domain Model](docs/architecture/adr-004-domain-model.md) -- Data model for multi-domain researcher
+- [ADR-001: Hybrid Memory Architecture](docs/architecture/adr-001-hybrid-memory.md) -- Three-layer pattern with explicit failure mode mapping
+- [ADR-002: Ingest vs Query Time Processing](docs/architecture/adr-002-processing-strategy.md) -- Tiered processing with cost profiles per tier
+- [ADR-003: Contradiction and Staleness Detection](docs/architecture/adr-003-contradiction-detection.md) -- Contradictions as first-class entities
+- [ADR-004: Domain Model](docs/architecture/adr-004-domain-model.md) -- Typed artifact schema, knowledge graph edges, hypothesis lifecycle
 
 ## Discovery
 
@@ -60,23 +70,26 @@ See [docs/discovery/](docs/discovery/) for research phase documents:
 
 - [Persona: Solo Multi-Domain Researcher](docs/discovery/persona-solo-researcher.md)
 - [Design Questions](docs/discovery/design-questions.md) -- Resolved and open questions
-- [Failure Mode Analysis](docs/discovery/failure-modes.md) -- What breaks and how we prevent it
+- [Failure Mode Analysis](docs/discovery/failure-modes.md) -- What breaks in each approach and how WikiNext prevents it
 - [Explicit Assumptions](docs/discovery/assumptions.md) -- What we believe, how confident, how to validate
 
-## Background
+## Standing on the Shoulders
 
-This architecture is informed by [Jones's analysis](https://ppl-ai-file-upload.s3.amazonaws.com) of Karpathy's AI wiki vs OpenBrain, which frames the core fork as: does the AI think at ingest time or query time? WikiNext takes both -- structured storage for facts, periodic synthesis for narrative, and on-demand analysis for novel questions.
+WikiNext wouldn't exist without the thinking behind both projects:
 
-Key references:
-- Karpathy's wiki concept: ingest-time synthesis, compounding understanding
-- OpenBrain: query-time structured memory, faithful storage with on-demand synthesis
-- Jones's hybrid pattern: structured DB as source of truth, graph + wiki as compiled views
+- **Karpathy's key insight**: LLMs should be long-running *maintainers* of knowledge artifacts, not ephemeral answer engines. The wiki-as-compounding-understanding pattern is powerful. WikiNext preserves this by having AI agents maintain the graph and compile wiki views -- but treats the wiki as a regenerable artifact, not the source of truth.
+
+- **Jones's key insight (OpenBrain)**: Facts should be stored faithfully with provenance, not lossy-summarized into prose. The structured store + MCP bridge pattern is correct infrastructure. WikiNext builds on this by adding a knowledge graph layer and a compilation step that produces the browsable wiki Karpathy envisioned -- without sacrificing the data integrity OpenBrain provides.
+
+- **What WikiNext adds**: The explicit hybrid architecture (three processing tiers), cross-domain bridge detection, typed artifact schemas for research workflows, hypothesis lifecycle tracking, and first-class contradiction handling with resolution provenance.
 
 ## Project Status
 
 **Phase: Discovery & Architecture Definition**
 
 This project is deliberately in a deep discovery phase. Early definition work matters more than speed to execution -- requirement errors become dramatically more costly in later phases.
+
+Next milestone: prototype with 50-100 real documents to validate the three-layer architecture against actual research workflows.
 
 ## License
 
